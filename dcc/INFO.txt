@@ -1,0 +1,1 @@
+Folder to store Diablo II monster graphics files from MPQ (dcc, cof, dat)

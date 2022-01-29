@@ -1,30 +1,28 @@
 <?php
 
-//class for getting diablo TXT data
-
 class D2Data {
 
-	//needed data arrays
 	public $MONSTATS;
 	public $MONSTATS2;
 	public $MONMODE;
 	public $COMPCODE;
+	public $COMPOSIT;
+	public $PLRTYPE;
 
-	//converted strings from all tbl files
-	public $STRINGS = array();
+	public $STRINGS = [];
 
-	//file with converted strings
 	private $stringfile = D2STRINGPATH.'strings.txt'; //converted string file
 
 
 	public function __construct() {
-		$this->MONSTATS = $this->ReadMonStats();
+		$this->MONSTATS  = $this->ReadMonStats();
 		$this->MONSTATS2 = $this->ReadMonStats2();
-		$this->MONMODE = $this->ReadMonMode();
-    $this->COMPCODE = $this->ReadCompCode();
+		$this->MONMODE   = $this->ReadMonMode();
+		$this->COMPCODE  = $this->ReadCompCode();
+		$this->COMPOSIT  = $this->ReadComposit();
+		$this->PLRTYPE   = $this->ReadPlrType();
 
 
-		//read string file, if not found, proccess tbl files
 		if(!file_exists($this->stringfile)) {
 			$this->ReadTblFile(D2STRINGPATH.'string.tbl');
 			$this->ReadTblFile(D2STRINGPATH.'expansionstring.tbl');
@@ -38,46 +36,65 @@ class D2Data {
 
 	public function ReadMonStats() {
 		$txtfile = 'MonStats';
-		$select = array('Id', 'hcIdx', 'TransLvl', 'NameStr', 'Code');
+		$select = ['Id', 'hcIdx', 'TransLvl', 'NameStr', 'Code'];
 		return $this->ReadTxtFile($txtfile, $select);
 	}
 
 	public function ReadMonStats2() {
 		$txtfile = 'monstats2';
-		$select = array('Id', 'BaseW', 'HDv', 'TRv', 'LGv', 'Rav', 'Lav', 'RHv', 'LHv', 'SHv', 'S1v', 'S2v', 'S3v', 'S4v', 'S5v', 'S6v', 'S7v', 'S8v',
-    	'HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8',
-			'Utrans', 'Utrans(N)', 'Utrans(H)');
+		$select = ['Id', 'BaseW', 'HDv', 'TRv', 'LGv', 'Rav', 'Lav', 'RHv', 'LHv', 'SHv', 'S1v', 'S2v', 'S3v', 'S4v', 'S5v', 'S6v', 'S7v', 'S8v',
+			'HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8',
+			'Utrans', 'Utrans(N)', 'Utrans(H)'];
 		return $this->ReadTxtFile($txtfile, $select);
 	}
 
 	public function ReadMonMode() {
 		$txtfile = 'MonMode';
-		$select = array('name', 'code');
+		$select = ['name', 'code'];
 		return $this->ReadTxtFile($txtfile, $select);
 	}
 
 	public function ReadCompCode() {
 		$txtfile = 'CompCode';
-		$select = array('component', 'code');
+		$select = ['component', 'code'];
 		$compcodes = $this->ReadTxtFile($txtfile, $select);
-		$res = array();
+		$res = [];
 		foreach($compcodes as $compcode) {
 			$res[$compcode['code']] = $compcode['component'];
 		}
 		return $res;
 	}
 
+	public function ReadComposit() {
+		$txtfile = 'Composit';
+		$select = ['Name', 'Token'];
+		$composit = $this->ReadTxtFile($txtfile, $select);
+		$res = [];
+		foreach($composit as $c) {
+			$res[$c['Token']] = $c['Name'];
+		}
+		return $res;
+	}
+
+	public function ReadPlrType() {
+		$txtfile = 'PlrType';
+		$select = ['Name', 'Token'];
+		return $this->ReadTxtFile($txtfile, $select);
+	}
+
 	//reading of txt files
 	public function ReadTxtFile($txtfile, $select) {
 		$path = D2TXTPATH;
 		$ext = '.txt';
+
 		if(!file_exists($path.$txtfile.$ext)) {
 			echo 'File ['.$path.$txtfile.$ext.'] not found<br />';
 			return;
 		}
+
 		$filedata = file($path.$txtfile.$ext);
-		$txtdata = array();
-		$header = array();
+		$txtdata = [];
+		$header = [];
 
 		//in some files skip Expansion index, because it does not count
 		$skipExp = ($txtfile == 'UniqueItems' || $txtfile == 'SetItems') ? true : false;
@@ -89,15 +106,20 @@ class D2Data {
 				//get indexes of data we want to gather them
 				foreach($data as $k => $title) {
 					$title = trim($title);
-					if(!in_array($title, $select)) continue;
+					if(!in_array($title, $select)) {
+						continue;
+					}
 					$header[$title] = $k;
 				}
 				continue;
 			}
 
-			if($skipExp && $data[0] == $indexExp) continue; //skipping Expansion text for some files, otherwise it breaks indexing from various item props
+			//skipping Expansion text for some files, otherwise it breaks indexing from various item props
+			if($skipExp && $data[0] == $indexExp) {
+				continue;
+			}
 
-			$row = array();
+			$row = [];
 			foreach($select as $title) {
 				$row[$title] = trim($data[$header[$title]]);
 			}
@@ -211,5 +233,95 @@ class D2Data {
 		}
 	}
 
+	//character cell parts. Instead of building it from dcc files names, it is hardcoded here
+	public $CHAR_PARTS = [
+		'ai' => [
+			'HD' => ['bhm', 'cap', 'crn', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['axf', 'clw', 'hxb', 'ktr', 'lbb', 'lbw', 'lit', 'lxb', 'sbb', 'sbw', 'skr'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['axe', 'axf', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'clw', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'ktr', 'lax', 'lit', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'opl', 'ops', 'pax', 'pik', 'pil', 'scm', 'scy', 'skr', 'spr', 'ssd', 'sst', 'tri', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'SH' => ['bsh', 'buc', 'kit', 'lrg', 'spk', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+		'am' => [
+			'HD' => ['bhm', 'cap', 'crn', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['am1', 'am2', 'hxb', 'lbb', 'lbw', 'lxb', 'sbb', 'sbw'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['am3', 'axe', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'lax', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'opl', 'ops', 'pax', 'pik', 'pil', 'scm', 'scy', 'spr', 'ssd', 'sst', 'tri', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'SH' => ['bsh', 'buc', 'kit', 'lrg', 'spk', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+		'ba' => [
+			'HD' => ['ba1', 'ba3', 'ba5', 'bhm', 'cap', 'crn', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['axe', 'bsd', 'bwn', 'clb', 'clm', 'crs', 'dgr', 'dir', 'fla', 'flc', 'glv', 'gpl', 'gps', 'gsd', 'hax', 'jav', 'lbb', 'lbw', 'lsd', 'mac', 'opl', 'ops', 'pil', 'sbb', 'sbw', 'scm', 'ssd', 'whm', 'wnd', 'ywn'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['axe', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'lax', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'opl', 'ops', 'pax', 'pik', 'pil', 'scm', 'scy', 'spr', 'ssd', 'sst', 'tri', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'SH' => ['bsh', 'buc', 'kit', 'lrg', 'spk', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+		'chars' => [
+		],
+		'dz' => [
+			'HD' => ['bhm', 'cap', 'crn', 'dr1', 'dr3', 'dr4', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['hxb', 'lbb', 'lbw', 'lwb', 'lxb', 'sbb', 'sbw'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['axe', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'lax', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'opl', 'ops', 'pax', 'pik', 'pil', 'scm', 'scy', 'spr', 'ssd', 'sst', 'tri', 'vpl', 'vps', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'SH' => ['bsh', 'buc', 'kit', 'lrg', 'spk', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+		'ne' => [
+			'HD' => ['bhm', 'cap', 'crn', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['hxb', 'lbb', 'lbw', 'lxb', 'sbb', 'sbw'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['axe', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'lax', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'opl', 'ops', 'pax', 'pik', 'pil', 'scm', 'scy', 'spr', 'ssd', 'sst', 'tri', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'S3' => ['ne1', 'ne2', 'ne3'],
+			'SH' => ['bsh', 'buc', 'kit', 'lrg', 'spk', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+		'pa' => [
+			'HD' => ['bhm', 'cap', 'crn', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['hxb', 'lbb', 'lbw', 'lwb', 'lxb', 'sbb', 'sbw'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['axe', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'fls', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'lax', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'opl', 'ops', 'pax', 'pik', 'pil', 'pot', 'scm', 'scy', 'spr', 'ssd', 'sst', 'tri', 'vpl', 'vps', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'SH' => ['bsh', 'buc', 'hsh', 'kit', 'lrg', 'pa1', 'pa3', 'pa5', 'spk', 'tor', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+		'so' => [
+			'HD' => ['bhm', 'cap', 'crn', 'fhl', 'ghm', 'hlm', 'lit', 'msk', 'skp'],
+			'LA' => ['hvy', 'lit', 'med'],
+			'LG' => ['hvy', 'lit', 'med'],
+			'LH' => ['lbb', 'lbw', 'sbb', 'sbw'],
+			'RA' => ['hvy', 'lit', 'med'],
+			'RH' => ['axe', 'brn', 'bsd', 'bst', 'btx', 'bwn', 'clb', 'clm', 'crs', 'cst', 'dgr', 'dir', 'fla', 'flc', 'gix', 'glv', 'gpl', 'gps', 'gsd', 'hal', 'hax', 'hxb', 'jav', 'lax', 'lsd', 'lst', 'lxb', 'mac', 'mau', 'ob1', 'ob3', 'ob4', 'opl', 'ops', 'pax', 'pik', 'pil', 'scm', 'scy', 'spr', 'ssd', 'sst', 'tri', 'whm', 'wnd', 'ywn'],
+			'S1' => ['hvy', 'lit', 'med'],
+			'S2' => ['hvy', 'lit', 'med'],
+			'SH' => ['bsh', 'buc', 'kit', 'lrg', 'spk', 'tow'],
+			'TR' => ['hvy', 'lit', 'med'],
+		],
+	];
 }
 ?>

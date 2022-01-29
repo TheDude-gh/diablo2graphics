@@ -1,7 +1,6 @@
 <?php
 
 //common functions
-
 	function expost($name, $def = null){
 		return isSet($_POST[$name]) ? $_POST[$name] : $def;
 	}
@@ -19,27 +18,20 @@
 	}
 
 //FILE
-	function file_write($soubor,$data){
-		if(!$file = FOpen($soubor, 'w')) return false;
-		elseif(!FWrite($file, $data)) return false;
-		FClose($file);
-		return true;
+	function file_write($filename, $data){
+		return file_put_contents($filename, $data);
 	}
 
-	function file_append($soubor,$data){
-		if(!$file = FOpen($soubor, 'a')) return false;
-		elseif(!FWrite($file,$data)) return false;
-		else FClose($file);
-		return true;
+	function file_append($filename, $data){
+		return file_put_contents($filename, $data, FILE_APPEND);
 	}
 
-//COMMON
 	function comma($value){
 		return number_format($value, 0, ',', '&nbsp;');
 	}
 
-	function padleft($value, $len = 2){
-		return str_pad($value, $len, 0, STR_PAD_LEFT);
+	function padleft($value, $len = 2, $char = '0'){
+		return str_pad($value, $len, $char, STR_PAD_LEFT);
 	}
 
 	function vd($var){

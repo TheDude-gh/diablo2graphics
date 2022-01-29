@@ -1,9 +1,9 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns='http://www.w3.org/1999/xhtml' xml:lang='cs'>
 <head>
-	<title>dcc</title>
+	<title>Diablo 2 Graphics Reader</title>
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
-	<meta http-equiv="content-language" content="cs" />
+	<meta http-equiv="content-language" content="en" />
 	<link rel="icon" href="./graphics/favicon.ico" />
 	<link rel="stylesheet" type="text/css" href="./css/itemlist.css?v=1" />
 	<style>
@@ -20,10 +20,13 @@
 	a, a:visited { color: #00f; text-decoration: none; }
 	a:hover { text-decoration: underline; }
 	select {min-width: 50px; text-align:center; background: #eed; }
-  input { background: #eed; }
+	input { background: #eed; }
+	h2 a, h2 a:visited { color : #000; }
 
 	.smalltable {font-size: 14px;}
 	.smalltable1 { width: 75%;  margin: 1em auto;}
+	.cof { border:none; }
+	.cof th, .cof td { font-family: 'Courier New', monospace; font-size: 12px; border:none; padding: 0px 8px;}
 
 	.inormal { color: #555; font-weight: bold; }
 	.imagic { color: #4850B8; font-weight: bold;}
@@ -35,10 +38,11 @@
 	.mono { font-family: 'courier new', monospace; font-size: 12px;}
 	/*img { width: 256px; margin: 0px auto;}*/
 	.img1 { height:80px; image-rendering: pixelated; }
-  .img2 { height:100px; image-rendering: pixelated; }
+	.img2 { height:100px; image-rendering: pixelated; }
 	</style>
 </head>
 <body>
+<h2><a href="index.php">Diablo 2 Graphics Reader</a></h2>
 <div>
 <p>
 
@@ -76,36 +80,57 @@
 	if($mondo) {
 		$D2DATA = new D2Data();
 
-		$dccpath = D2DCCPATH;
-		$dccf = scandir($dccpath);
 
+		$dccf = scandir(D2DCCPATH_MONSTER);
+		$options = [];
+
+		//MONSTERS
 		foreach($D2DATA->MONSTATS as $mond) {
-    	if(!in_array($mond['Code'], $dccf)) continue;
-			$options[$mond['Id']] = $mond['Id'].' - '.$D2DATA->GetString($mond['NameStr']);
+			$moncode = strtolower($mond['Code']);
+			if(!in_array($moncode, $dccf)) {
+				continue;
+			}
+			$options[$mond['Id']] = $D2DATA->GetString($mond['NameStr']).'-'.$mond['Id'].' ('.$moncode.')';
 		}
 		natsort($options);
 
+		
+		//CHARACTERS
+		$dccf = scandir(D2DCCPATH_CHAR);
+		$optionsChar = [];
+		foreach($D2DATA->PLRTYPE as $char) {
+			$charcode = strtolower($char['Token']);
+			if(!in_array($charcode, $dccf)) {
+				continue;
+			}
+			$optionsChar[$char['Token']] = $char['Name'];
+		}
+		natsort($optionsChar);
+
 		$select = '<select name="mon"><option></option>';
+		foreach($optionsChar as $mid => $opt) {
+			$sel = $monid == $mid ? ' selected="selected"' : '';
+			$select .= '<option value="'.$mid.'"'.$sel.'>'.$opt.'</option>';
+		}
+		$select .= '<option></option>'; //spacer between chars and monsters
 		foreach($options as $mid => $opt) {
 			$sel = $monid == $mid ? ' selected="selected"' : '';
-    	$select .= '<option value="'.$mid.'"'.$sel.'>'.$opt.'</option>';
+			$select .= '<option value="'.$mid.'"'.$sel.'>'.$opt.'</option>';
 		}
-    $select .= '</select>'.EOL;
+		$select .= '</select>'.EOL;
 		echo $select;
 		echo '
-    	<input type="hidden" name="monprev" value="'.$monid.'" />
+			<input type="hidden" name="monprev" value="'.$monid.'" />
 			<input type="submit" name="ok" value="ok" /><br />';
 
 	}
 
-	//create palette class
 	if($paldo) {
-  	$paletteFile = expost('palette', 'act1');
+		$paletteFile = expost('palette', 'act1');
 		$exp = '.dat';
-		$D2PALETTE = new D2Palette($palettePath.$paletteFile.$exp);
+		$D2PALETTE = new D2Palette(D2PALETTEPATH.$paletteFile.$exp);
 	}
 
-	//make sprites
 	if($sprdo) {
 		if($monid) {
 			$d2sprite = new D2SpriteMaker($monid);
@@ -114,12 +139,21 @@
 
 
 function ScanDirM($dir, $mask = '') {
-	$files = array();
-	if(!file_exists($dir)) return $files;
+	$files = [];
+
+	if(!file_exists($dir)) {
+		return $files;
+	}
+
 	$sd = scandir($dir);
 	foreach($sd as $f) {
-		if(is_dir($f)) continue;
-		if($mask != '' && !preg_match($mask, $f)) continue;
+		if(is_dir($f)) {
+			continue;
+		}
+		if($mask != '' && !preg_match($mask, $f)) {
+			continue;
+		}
+
 		$files[] = $dir.$f;
 	}
 	return $files;

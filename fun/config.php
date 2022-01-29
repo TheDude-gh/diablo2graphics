@@ -6,15 +6,21 @@
 	//path to global palettes
 	DEFINE('D2PALETTEPATH', './palette/');
 
-	//path to monster dcc files
-  DEFINE('D2DCCPATH', './dcc/');
+	//path to dcc files
+	DEFINE('D2DCCPATH', './dcc/');
+
+	//path to monsters dcc files
+	DEFINE('D2DCCPATH_MONSTER', './dcc/monsters/');
+
+	//path to characterss dcc files
+	DEFINE('D2DCCPATH_CHAR', './dcc/chars/');
 
 	//path to strings files
-  DEFINE('D2STRINGPATH', './txt/');
+	DEFINE('D2STRINGPATH', './txt/');
 
 	//path to txt files
-  DEFINE('D2TXTPATH', './txt/');
+	DEFINE('D2TXTPATH', './txt/');
 
 	//path to result image files
-  DEFINE('D2IMGPATH', './frames/');
+	DEFINE('D2IMGPATH', './frames/');
 ?>

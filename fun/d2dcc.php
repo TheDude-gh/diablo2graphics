@@ -5,21 +5,21 @@
 
 class D2DCC {
 
-	public const DCC_MAX_DIR = 32;
-	public const DCC_MAX_FRAME = 256;
-	public const DCC_MAX_PB_ENTRY = 85000;
+	const DCC_MAX_DIR = 32;
+	const DCC_MAX_FRAME = 256;
+	const DCC_MAX_PB_ENTRY = 85000;
 
 	private $bitreader;
 	private $imagefile;
 	private $imagepath;
-	private $imagepaths = array();
+	private $imagepaths = [];
 	private $dccfilename;
 	private $imageEX = false;
 	private $imageOK = false;
 
 	//bitsizes table
-	private $var0dec = array(0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32);
-	private $nb_pix_table = array(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4);
+	private $var0dec = [0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32];
+	private $nb_pix_table = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
 	private $signature;
 	private $version;
@@ -27,8 +27,8 @@ class D2DCC {
 	public $framesC; //frames count
 	private $totalSizeCoded;
 
-	public $directions = array(); //direction array
-	private $diroffsets = array();
+	public $directions = []; //direction array
+	private $diroffsets = [];
 
 	private $bitmap; //frame buffer bitmap
 	private $pixelmap; //final bitmap
@@ -76,151 +76,164 @@ class D2DCC {
 			$diro = $this->bitreader->ReadUint32();
 			$this->diroffsets[] = $diro;
 		}
-
-		//direction data
-		for($i = 0; $i < $this->directionsC; $i++) {
-			$this->bitreader->SetPos($this->diroffsets[$i]);
-
-			//bitstream
-			$dir = new DCCDirection();
-
-			$dir->outSizeCoded = $this->bitreader->ReadUint32();
-
-			$dir->compressionFlags = $this->bitreader->ReadBits(2);
-
-			$dir->var0B = $this->var0dec[$this->bitreader->ReadBits(4)];
-			$dir->widthB = $this->var0dec[$this->bitreader->ReadBits(4)];
-			$dir->heightB = $this->var0dec[$this->bitreader->ReadBits(4)];
-			$dir->xoffB = $this->var0dec[$this->bitreader->ReadBits(4)];
-			$dir->yoffB = $this->var0dec[$this->bitreader->ReadBits(4)];
-			$dir->optbytesB = $this->var0dec[$this->bitreader->ReadBits(4)];
-			$dir->codedBytesB = $this->var0dec[$this->bitreader->ReadBits(4)];
-
-			// init direction box min & max
-			$boxD = new DCCBox();
-			$boxD->xmin = $boxD->ymin = 0x80000000;
-			$boxD->xmax = $boxD->ymax = -0x80000000;
-
-			for($n = 0; $n < $this->framesC; $n++) {
-				$frame = new DCCFrame();
-				$frame->var0 = $this->bitreader->ReadBits($dir->var0B);
-				$frame->width = $this->bitreader->ReadBits($dir->widthB);
-				$frame->height = $this->bitreader->ReadBits($dir->heightB);
-				$frame->xoff = $this->bitreader->ReadBits($dir->xoffB);
-				$frame->yoff = $this->bitreader->ReadBits($dir->yoffB);
-				$frame->optbytes = $this->bitreader->ReadBits($dir->optbytesB);
-				$frame->codedBytes = $this->bitreader->ReadBits($dir->codedBytesB);
-				$frame->frameBU = $this->bitreader->ReadBits(1);
-
-				//offsets are signed
-				if($frame->xoff >= (1 << ($dir->xoffB - 1))) { //6 64
-					$frame->xoff = $frame->xoff - (1 << $dir->xoffB);
-				}
-				if($frame->yoff >= (1 << ($dir->yoffB - 1))) { //6 64
-					$frame->yoff = $frame->yoff - (1 << $dir->yoffB);
-				}
-
-				// frame box
-				$box = new DCCBox();
-				$box->xmin = $frame->xoff;
-				$box->xmax = $box->xmin + $frame->width - 1;
-
-				if ($frame->frameBU) { // bottom-up
-					$box->ymin = $frame->yoff;
-					$box->ymax = $box->ymin + $frame->height - 1;
-				}
-				else { // top-down
-					$box->ymax = $frame->yoff;
-					$box->ymin = $box->ymax - $frame->height + 1;
-				}
-				$box->w = $box->xmax - $box->xmin + 1;
-				$box->h = $box->ymax - $box->ymin + 1;
-				$frame->box = $box;
-
-				// direction box
-				if ($box->xmin < $boxD->xmin) {
-					$boxD->xmin = $box->xmin;
-				}
-				if ($box->ymin < $boxD->ymin) {
-					$boxD->ymin = $box->ymin;
-				}
-				if ($box->xmax > $boxD->xmax) {
-					$boxD->xmax = $box->xmax;
-				}
-				if ($box->ymax > $boxD->ymax) {
-					$boxD->ymax = $box->ymax;
-				}
-
-				$dir->frames[$n] = $frame;
+		
+		//read directions data
+		for($d = 0; $d < $this->directionsC; $d++) {
+			// if we want only one dir, skip the others
+			if($this->dir_selected != -1 && $d != $this->dir_selected) {
+				continue;
 			}
-			// frames header END
-
-			$boxD->w = $boxD->xmax - $boxD->xmin + 1;
-			$boxD->h = $boxD->ymax - $boxD->ymin + 1;
-			$dir->box = $boxD;
-
-			//READ OPTIONAL DATA --- TODO
-			if($dir->optbytesB != 0) {
-				//read align bytes and align
-				for($f = 0; $f < $this->framesC; $f++) {
-					//$this->bitreader->SkipBytes($optbytes);
-				}
-			}
-			//OPTIONAL DATA END
-
-			if($dir->compressionFlags & 0x02) {
-				$dir->equalCellsSize = $this->bitreader->ReadBits(20);
-			}
-			$dir->pixelMaskSize = $this->bitreader->ReadBits(20);
-			if($dir->compressionFlags & 0x01) {
-				$dir->encTypeSize = $this->bitreader->ReadBits(20);
-				$dir->rawPixelCodesSize = $this->bitreader->ReadBits(20);
-			}
-
-			//get used pixels
-			$dir->pixelValueKeys = array();
-			$dir->pixelused = array();
-			for($n = 0; $n < 8; $n++) {
-				$pixelv = $this->bitreader->ReadBits(32);
-				for($p = 0; $p < 32; $p++) {
-					if($pixelv & (1 << $p)) {
-						$pixeln = $n * 32 + $p;
-						$dir->pixelused[] = $pixeln;
-					}
-				}
-			}
-
-			//set streams starting positions
-			$dir->PSequalCells = $this->bitreader->GetBitPos();
-			$this->bitreader->SkipBits($dir->equalCellsSize);
-
-			$dir->PSpixelMask = $this->bitreader->GetBitPos();
-			$this->bitreader->SkipBits($dir->pixelMaskSize);
-
-			$dir->PSencType = $this->bitreader->GetBitPos();
-			$this->bitreader->SkipBits($dir->encTypeSize);
-
-			$dir->PSrawPixelCodes = $this->bitreader->GetBitPos();
-			$this->bitreader->SkipBits($dir->rawPixelCodesSize);
-
-			$dir->PSpixel_code_and_displacement = $this->bitreader->GetBitPos();
-			
-			$this->directions[$i] = $dir;
-
-			if($i == $this->directionsC - 1) {
-				$dir->pixel_code_and_displacement = ($this->bitreader->GetLength() * 8) - $this->bitreader->GetBitPos();
-			}
-			else {
-				$dir->pixel_code_and_displacement = ($this->diroffsets[$i+1] * 8) - $this->bitreader->GetBitPos();
-			}
-
+			$this->ReadDirection($d);
 		}
-		//directions end
+	}
+		
+	//read one direction data
+	private function ReadDirection($dirnum) {
+		
+		$this->bitreader->SetPos($this->diroffsets[$dirnum]);
+
+		//bitstream
+		$dir = new DCCDirection();
+
+		$dir->outSizeCoded = $this->bitreader->ReadUint32();
+
+		$dir->compressionFlags = $this->bitreader->ReadBits(2);
+
+		$dir->var0B = $this->var0dec[$this->bitreader->ReadBits(4)];
+		$dir->widthB = $this->var0dec[$this->bitreader->ReadBits(4)];
+		$dir->heightB = $this->var0dec[$this->bitreader->ReadBits(4)];
+		$dir->xoffB = $this->var0dec[$this->bitreader->ReadBits(4)];
+		$dir->yoffB = $this->var0dec[$this->bitreader->ReadBits(4)];
+		$dir->optbytesB = $this->var0dec[$this->bitreader->ReadBits(4)];
+		$dir->codedBytesB = $this->var0dec[$this->bitreader->ReadBits(4)];
+
+		// init direction box min & max
+		$boxD = new DCCBox();
+		$boxD->xmin = $boxD->ymin = 0x80000000;
+		$boxD->xmax = $boxD->ymax = -0x80000000;
+
+		for($n = 0; $n < $this->framesC; $n++) {
+			$frame = new DCCFrame();
+			$frame->var0 = $this->bitreader->ReadBits($dir->var0B);
+			$frame->width = $this->bitreader->ReadBits($dir->widthB);
+			$frame->height = $this->bitreader->ReadBits($dir->heightB);
+			$frame->xoff = $this->bitreader->ReadBits($dir->xoffB);
+			$frame->yoff = $this->bitreader->ReadBits($dir->yoffB);
+			$frame->optbytes = $this->bitreader->ReadBits($dir->optbytesB);
+			$frame->codedBytes = $this->bitreader->ReadBits($dir->codedBytesB);
+			$frame->frameBU = $this->bitreader->ReadBits(1);
+
+			//offsets are signed
+			if($frame->xoff >= (1 << ($dir->xoffB - 1))) { //6 64
+				$frame->xoff = $frame->xoff - (1 << $dir->xoffB);
+			}
+			if($frame->yoff >= (1 << ($dir->yoffB - 1))) { //6 64
+				$frame->yoff = $frame->yoff - (1 << $dir->yoffB);
+			}
+
+			// frame box
+			$box = new DCCBox();
+			$box->xmin = $frame->xoff;
+			$box->xmax = $box->xmin + $frame->width - 1;
+
+			if ($frame->frameBU) { // bottom-up
+				$box->ymin = $frame->yoff;
+				$box->ymax = $box->ymin + $frame->height - 1;
+			}
+			else { // top-down
+				$box->ymax = $frame->yoff;
+				$box->ymin = $box->ymax - $frame->height + 1;
+			}
+			$box->w = $box->xmax - $box->xmin + 1;
+			$box->h = $box->ymax - $box->ymin + 1;
+			$frame->box = $box;
+
+			// direction box
+			if ($box->xmin < $boxD->xmin) {
+				$boxD->xmin = $box->xmin;
+			}
+			if ($box->ymin < $boxD->ymin) {
+				$boxD->ymin = $box->ymin;
+			}
+			if ($box->xmax > $boxD->xmax) {
+				$boxD->xmax = $box->xmax;
+			}
+			if ($box->ymax > $boxD->ymax) {
+				$boxD->ymax = $box->ymax;
+			}
+
+			$dir->frames[$n] = $frame;
+		}
+		// frames header END
+
+		$boxD->w = $boxD->xmax - $boxD->xmin + 1;
+		$boxD->h = $boxD->ymax - $boxD->ymin + 1;
+		$dir->box = $boxD;
+
+		//READ OPTIONAL DATA --- TODO
+		if($dir->optbytesB != 0) {
+			//read align bytes and align
+			for($f = 0; $f < $this->framesC; $f++) {
+				//$this->bitreader->SkipBytes($optbytes);
+			}
+		}
+		//OPTIONAL DATA END
+
+		if($dir->compressionFlags & 0x02) {
+			$dir->equalCellsSize = $this->bitreader->ReadBits(20);
+		}
+		$dir->pixelMaskSize = $this->bitreader->ReadBits(20);
+		if($dir->compressionFlags & 0x01) {
+			$dir->encTypeSize = $this->bitreader->ReadBits(20);
+			$dir->rawPixelCodesSize = $this->bitreader->ReadBits(20);
+		}
+
+		//get used pixels
+		$dir->pixelValueKeys = [];
+		$dir->pixelused = [];
+		for($n = 0; $n < 8; $n++) {
+			$pixelv = $this->bitreader->ReadBits(32);
+			for($p = 0; $p < 32; $p++) {
+				if($pixelv & (1 << $p)) {
+					$pixeln = $n * 32 + $p;
+					$dir->pixelused[] = $pixeln;
+				}
+			}
+		}
+
+		//set streams starting positions
+		$dir->PSequalCells = $this->bitreader->GetBitPos();
+		$this->bitreader->SkipBits($dir->equalCellsSize);
+
+		$dir->PSpixelMask = $this->bitreader->GetBitPos();
+		$this->bitreader->SkipBits($dir->pixelMaskSize);
+
+		$dir->PSencType = $this->bitreader->GetBitPos();
+		$this->bitreader->SkipBits($dir->encTypeSize);
+
+		$dir->PSrawPixelCodes = $this->bitreader->GetBitPos();
+		$this->bitreader->SkipBits($dir->rawPixelCodesSize);
+
+		$dir->PSpixel_code_and_displacement = $this->bitreader->GetBitPos();
+
+		$this->directions[$dirnum] = $dir;
+
+		if($dirnum == $this->directionsC - 1) {
+			$dir->pixel_code_and_displacement = ($this->bitreader->GetLength() * 8) - $this->bitreader->GetBitPos();
+		}
+		else {
+			$dir->pixel_code_and_displacement = ($this->diroffsets[$dirnum + 1] * 8) - $this->bitreader->GetBitPos();
+		}
 	}
 
 	public function CreateImages() {
 		foreach($this->directions as $d => &$dir) {
-			if($this->dir_selected != -1 && $d != $this->dir_selected) continue; // if we want only one dir, skip the others
+
+			// if we want only one dir, skip the others
+			if($this->dir_selected != -1 && $d != $this->dir_selected) {
+				continue; 
+			}
+			
 			$this->PrepareDirectionCells($dir);
 
 			foreach($dir->frames as $f => &$frame) {
@@ -234,7 +247,7 @@ class D2DCC {
 
 	public function PrepareDirectionCells(&$dir) {
 		//equivalent of creating frame buffer bitmap
-		$this->bitmap = array();
+		$this->bitmap = [];
 		for($x = 0; $x < $dir->box->w; $x++) {
 			for($y = 0; $y < $dir->box->h; $y++) {
 				$this->bitmap[$x][$y] = 0;
@@ -252,7 +265,7 @@ class D2DCC {
 
 		$nb_cell = $nb_cell_w * $nb_cell_h;
 
-		$cell_w = $cell_h = array();
+		$cell_w = $cell_h = [];
 
 		if ($nb_cell_w == 1) {
 			$cell_w[0] = $w;
@@ -297,8 +310,8 @@ class D2DCC {
 
 	public function PrepareFrameCells(&$frame, $dbox) {
 		$nb_cell_w = $nb_cell_h = $nb_cell = 0;
-		$cell_w = array();
-		$cell_h = array();
+		$cell_w = [];
+		$cell_h = [];
 
 		// width (in # of pixels) in 1st column
 		$w = 4 - (($frame->box->xmin - $dbox->xmin) % 4);
@@ -379,7 +392,7 @@ class D2DCC {
 
 		$pb_idx = -1; // current entry of pixel_buffer
 
-		$cell_buffer = array();
+		$cell_buffer = [];
 
 		$echo = '';
 
@@ -431,8 +444,8 @@ class D2DCC {
 
 					if ($next_cell == false) {
 						// decode the pixels
-      			// read_pixel[] is a stack, where we push the pixel code
-						$read_pixel = array(0, 0, 0, 0);
+						// read_pixel[] is a stack, where we push the pixel code
+						$read_pixel = [0, 0, 0, 0];
 						$last_pixel = 0;
 						$nb_pix = $this->nb_pix_table[$pixel_mask];
 						if ($nb_pix && $dir->encTypeSize) {
@@ -528,7 +541,7 @@ class D2DCC {
 		}
 
 		// create the temp frame bitmap (size = current direction box)
-		$this->pixelmap = array();
+		$this->pixelmap = [];
 
 		$ipb = 0; //pixel buffer index
 
@@ -651,7 +664,7 @@ class D2DCC {
 	}
 
 	public function BufferPixelMapCopy($xsrc, $ysrc, $xdest, $ydest, $w, $h) {
-		$buf = array();
+		$buf = [];
 		//save source to buffer
 		for ($x = 0; $x < $w; $x++) {
 			for ($y = 0; $y < $h; $y++) {
@@ -668,7 +681,7 @@ class D2DCC {
 	}
 
 	public function ClearCellToColor($cell, $colorindex = 0) {
-    for ($y = $cell->y0; $y < $cell->y0 + $cell->h; $y++) {
+		for ($y = $cell->y0; $y < $cell->y0 + $cell->h; $y++) {
 			for ($x = $cell->x0; $x < $cell->x0 + $cell->w; $x++) {
 				$this->bitmap[$x][$y] = $colorindex;
 			}
@@ -676,7 +689,7 @@ class D2DCC {
 	}
 
 	public function GetFramesBitmaps($d) {
-		if($d >= $this->directionsC) return array();
+		if($d >= $this->directionsC) return [];
 		return $this->directions[$d]->pixelmap;
 	}
 
@@ -703,7 +716,7 @@ class D2DCC {
 				if($remap) {
 					$colorindex = $D2PALETTE->GetRemapIndex($this->transformLevel, $colorindex);
 				}
-				
+
 				$colorRGB = $D2PALETTE->GetColor($colorindex);
 				$color = imagecolorallocate($im, $colorRGB[0], $colorRGB[1], $colorRGB[2]);
 				imagesetpixel($im, $x, $y, $color);
@@ -719,10 +732,10 @@ class D2DCC {
 	public function GetImagePath($f) {
 		return $this->imagepaths[$f];
 	}
-	
+
 	public function ShowImages() {
 		foreach($this->imagepaths as $img) {
-		  echo '<img src="'.$img.'" style="height:150px; image-rendering: pixelated;" /> ';
+			echo '<img src="'.$img.'" style="height:150px; image-rendering: pixelated;" /> ';
 		}
 	}
 
@@ -741,7 +754,7 @@ class DCCDirection {
 	public $optbytesB;
 	public $codedBytesB;
 
-	public $frames = array();
+	public $frames = [];
 
 	public $equalCellsSize = 0;
 	public $pixelMaskSize = 0;
@@ -763,15 +776,15 @@ class DCCDirection {
 	public $PrawPixelCodes = 0;
 	public $Ppixel_code_and_displacement = 0;
 
-	public $pixelValueKeys = array();
-	public $pixelused = array();
+	public $pixelValueKeys = [];
+	public $pixelused = [];
 
 	public $box;
 	public $nb_cells_w;
 	public $nb_cells_h;
-	public $cells = array();
-	public $pixelBuf = array();
-	public $pixelmap = array(); //final pixel bitmaps for this diretion for each frame
+	public $cells = [];
+	public $pixelBuf = [];
+	public $pixelmap = []; //final pixel bitmaps for this diretion for each frame
 }
 
 class DCCFrame {
@@ -787,7 +800,7 @@ class DCCFrame {
 	public $box;
 	public $nb_cells_w;
 	public $nb_cells_h;
-	public $cells = array();
+	public $cells = [];
 
 }
 
@@ -812,7 +825,7 @@ class DCCcell {
 }
 
 class PixelEntry {
-	public $val = array(0, 0, 0, 0);
+	public $val = [0, 0, 0, 0];
 	public $frame = 0;
 	public $frame_cell_index = 0;
 }
@@ -826,7 +839,7 @@ class DCCBitmap {
 	public $yoff = 0;
 	public $boxf;
 	public $boxd;
-	public $bitmap = array(); //pixel bitmap
+	public $bitmap = []; //pixel bitmap
 
 	public function CreateBitmap() {
 		for ($x = 0; $x < $this->w; $x++) {

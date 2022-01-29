@@ -5,13 +5,14 @@
 class D2COF {
 	private $bitreader;
 	public $coffile;
+	public $coffilename;
 	private $fileOK = false;
 
 	public $layers = 0;
 	public $framesC = 0;
 	public $directionsC = 0;
-	public $name = array();
-	public $monmode_list = array();
+	public $wclass = []; //weapon class for each layer
+	public $monmode_list = [];
 
 	/*
 	BODY PARTS
@@ -55,10 +56,13 @@ class D2COF {
 	20  GH Knock back
 	*/
 
-	public $composit = array('HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8');
+	public $composit = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
 
 	public function __construct($coffile) {
 		$this->coffile = $coffile;
+
+		$pi = pathinfo($coffile);
+		$this->coffilename = $pi['filename'];
 
 		if(!file_exists($this->coffile)) {
 			echo 'Missing gfx '.$this->coffile.'<br />';
@@ -84,13 +88,9 @@ class D2COF {
 		$this->bitreader->SkipBytes(4);
 
 		for($i = 0; $i < $this->layers; $i++) {
-			$this->name[$i] = '';
-			for($x = 0; $x < 9; $x++) {
-				$c = $this->bitreader->ReadUint8();
-				if($c > 0x20) {
-					$this->name[$i] .= chr($c);
-				}
-			}
+			$num = $this->bitreader->ReadUint8(); //index in composit array
+			$this->bitreader->SkipBytes(4);
+			$this->wclass[$this->composit[$num]] = $this->bitreader->ReadString(); //weapon class for this layer
 		}
 
 		$this->bitreader->SkipBytes($this->framesC);
